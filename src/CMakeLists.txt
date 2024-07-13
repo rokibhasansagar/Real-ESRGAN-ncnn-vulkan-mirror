@@ -16,9 +16,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 project(realesrgan-ncnn-vulkan)
 
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.16)
 
-set(CMAKE_BUILD_TYPE Release)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
 
 option(USE_SYSTEM_NCNN "build with system libncnn" OFF)
 option(USE_SYSTEM_WEBP "build with system libwebp" OFF)
@@ -28,12 +30,22 @@ find_package(Threads)
 find_package(OpenMP)
 find_package(Vulkan REQUIRED)
 
+find_package(glslang)
+if(glslang_FOUND)
+    add_library(glslang ALIAS glslang::glslang)
+    add_library(SPIRV ALIAS glslang::SPIRV)
+endif()
+if (NOT TARGET glslang OR NOT TARGET SPIRV)
+    message(WARNING "glslang or SPIRV target not found! USE_SYSTEM_NCNN will be turned off.")
+    set(USE_SYSTEM_NCNN OFF)
+endif()
+
+# check glslangValidator
 find_program(GLSLANGVALIDATOR_EXECUTABLE NAMES glslangValidator PATHS $ENV{VULKAN_SDK}/bin NO_CMAKE_FIND_ROOT_PATH)
 message(STATUS "Found glslangValidator: ${GLSLANGVALIDATOR_EXECUTABLE}")
 
 macro(compile_shader SHADER_SRC)
     set(SHADER_SRC_FULLPATH ${CMAKE_CURRENT_SOURCE_DIR}/${SHADER_SRC})
-
     get_filename_component(SHADER_SRC_NAME_WE ${SHADER_SRC} NAME_WE)
     set(SHADER_SPV_HEX_FILE ${CMAKE_CURRENT_BINARY_DIR}/${SHADER_SRC_NAME_WE}.spv.hex.h)
     add_custom_command(
@@ -115,11 +127,6 @@ if(USE_SYSTEM_NCNN)
         endif()
         include("${GLSLANG_TARGET_DIR}/glslangTargets.cmake")
         include("${GLSLANG_TARGET_DIR}/SPIRVTargets.cmake")
-
-        if (NOT TARGET glslang OR NOT TARGET SPIRV)
-            message(WARNING "glslang or SPIRV target not found! USE_SYSTEM_NCNN will be turned off.")
-            set(USE_SYSTEM_NCNN OFF)
-        endif()
     endif()
 endif()
 
@@ -139,6 +146,8 @@ if(NOT USE_SYSTEM_NCNN)
 
     option(NCNN_INSTALL_SDK "" OFF)
     option(NCNN_PIXEL_ROTATE "" OFF)
+    option(NCNN_PIXEL_AFFINE "" OFF)
+    option(NCNN_PIXEL_DRAWING "" OFF)
     option(NCNN_VULKAN "" ON)
     option(NCNN_VULKAN_ONLINE_SPIRV "" ON)
     option(NCNN_BUILD_BENCHMARK "" OFF)
